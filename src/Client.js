@@ -1,21 +1,21 @@
-'use strict';
+"use strict";
 
-const EventEmitter = require('events');
-const puppeteer = require('puppeteer');
+const EventEmitter = require("events");
+const puppeteer = require("puppeteer");
 
-const Util = require('./util/Util');
-const InterfaceController = require('./util/InterfaceController');
+const Util = require("./util/Util");
+const InterfaceController = require("./util/InterfaceController");
 const {
     WhatsWebURL,
     DefaultOptions,
     Events,
     WAState,
     MessageTypes,
-} = require('./util/Constants');
-const { LoadUtils } = require('./util/Injected/Utils');
-const ChatFactory = require('./factories/ChatFactory');
-const ContactFactory = require('./factories/ContactFactory');
-const WebCacheFactory = require('./webCache/WebCacheFactory');
+} = require("./util/Constants");
+const { LoadUtils } = require("./util/Injected/Utils");
+const ChatFactory = require("./factories/ChatFactory");
+const ContactFactory = require("./factories/ContactFactory");
+const WebCacheFactory = require("./webCache/WebCacheFactory");
 const {
     ClientInfo,
     Message,
@@ -32,9 +32,9 @@ const {
     Reaction,
     Broadcast,
     ScheduledEvent,
-} = require('./structures');
-const NoAuth = require('./authStrategies/NoAuth');
-const { exposeFunctionIfAbsent } = require('./util/Puppeteer');
+} = require("./structures");
+const NoAuth = require("./authStrategies/NoAuth");
+const { exposeFunctionIfAbsent } = require("./util/Puppeteer");
 
 /**
  * Starting point for interacting with the WhatsApp Web API
@@ -120,13 +120,13 @@ class Client extends EventEmitter {
         try {
             const authTimeout = this.options.authTimeoutMs || 30000;
             await this.pupPage
-                .waitForFunction('window.Debug?.VERSION != undefined', {
+                .waitForFunction("window.Debug?.VERSION != undefined", {
                     timeout: authTimeout,
                     signal: abort.signal,
                 })
                 .catch((err) => {
                     if (abort.signal.aborted) throw err;
-                    throw 'auth timeout';
+                    throw "auth timeout";
                 });
             if (abort.signal.aborted) return;
             await this.setDeviceName(
@@ -139,17 +139,17 @@ class Client extends EventEmitter {
             const needAuthHandle = await this.pupPage.waitForFunction(
                 () => {
                     const state =
-                        window.require?.('WAWebSocketModel')?.Socket?.state;
+                        window.require?.("WAWebSocketModel")?.Socket?.state;
                     if (
                         !state ||
-                        state === 'OPENING' ||
-                        state === 'UNLAUNCHED' ||
-                        state === 'PAIRING'
+                        state === "OPENING" ||
+                        state === "UNLAUNCHED" ||
+                        state === "PAIRING"
                     ) {
                         return false;
                     }
                     return {
-                        need: state === 'UNPAIRED' || state === 'UNPAIRED_IDLE',
+                        need: state === "UNPAIRED" || state === "UNPAIRED_IDLE",
                         state,
                     };
                 },
@@ -195,7 +195,7 @@ class Client extends EventEmitter {
 
                     await exposeFunctionIfAbsent(
                         this.pupPage,
-                        'onQRChangedEvent',
+                        "onQRChangedEvent",
                         async (qr) => {
                             /**
                              * Emitted when a QR code is received
@@ -208,7 +208,7 @@ class Client extends EventEmitter {
                                 if (qrRetries > this.options.qrMaxRetries) {
                                     this.emit(
                                         Events.DISCONNECTED,
-                                        'Max qrcode retries reached',
+                                        "Max qrcode retries reached",
                                     );
                                     await this.destroy();
                                 }
@@ -218,32 +218,32 @@ class Client extends EventEmitter {
 
                     await this.pupPage.evaluate(async () => {
                         const registrationInfo = await window
-                            .require('WAWebSignalStoreApi')
+                            .require("WAWebSignalStoreApi")
                             .waSignalStore.getRegistrationInfo();
                         const noiseKeyPair = await window
-                            .require('WAWebUserPrefsInfoStore')
+                            .require("WAWebUserPrefsInfoStore")
                             .waNoiseInfo.get();
                         const staticKeyB64 = window
-                            .require('WABase64')
+                            .require("WABase64")
                             .encodeB64(noiseKeyPair.staticKeyPair.pubKey);
                         const identityKeyB64 = window
-                            .require('WABase64')
+                            .require("WABase64")
                             .encodeB64(registrationInfo.identityKeyPair.pubKey);
                         const advSecretKey = await window
-                            .require('WAWebUserPrefsMultiDevice')
+                            .require("WAWebUserPrefsMultiDevice")
                             .getADVSecretKey();
                         const platform = window.require(
-                            'WAWebCompanionRegClientUtils',
+                            "WAWebCompanionRegClientUtils",
                         ).DEVICE_PLATFORM;
                         const getQR = (ref) =>
                             ref +
-                            ',' +
+                            "," +
                             staticKeyB64 +
-                            ',' +
+                            "," +
                             identityKeyB64 +
-                            ',' +
+                            "," +
                             advSecretKey +
-                            ',' +
+                            "," +
                             platform;
 
                         const onRefChange = (_, ref) => {
@@ -252,19 +252,19 @@ class Client extends EventEmitter {
                         };
 
                         window.onQRChangedEvent(
-                            getQR(window.require('WAWebConnModel').Conn.ref),
+                            getQR(window.require("WAWebConnModel").Conn.ref),
                         ); // initial qr
                         window
-                            .require('WAWebConnModel')
-                            .Conn.on('change:ref', onRefChange); // future QR changes
+                            .require("WAWebConnModel")
+                            .Conn.on("change:ref", onRefChange); // future QR changes
 
                         // Remove QR listener once authentication succeeds
                         window
-                            .require('WAWebSocketModel')
-                            .Socket.on('change:hasSynced', () => {
+                            .require("WAWebSocketModel")
+                            .Socket.on("change:hasSynced", () => {
                                 window
-                                    .require('WAWebConnModel')
-                                    .Conn.off('change:ref', onRefChange);
+                                    .require("WAWebConnModel")
+                                    .Conn.off("change:ref", onRefChange);
                             });
                     });
                 }
@@ -272,15 +272,15 @@ class Client extends EventEmitter {
 
             await exposeFunctionIfAbsent(
                 this.pupPage,
-                'onAuthAppStateChangedEvent',
+                "onAuthAppStateChangedEvent",
                 async (state) => {
                     if (
-                        state == 'UNPAIRED_IDLE' &&
+                        state == "UNPAIRED_IDLE" &&
                         !pairWithPhoneNumber.phoneNumber
                     ) {
                         // refresh qr code
                         await this.pupPage.evaluate(() => {
-                            window.require('WAWebCmd').Cmd.refreshQR();
+                            window.require("WAWebCmd").Cmd.refreshQR();
                         });
                     }
                 },
@@ -288,7 +288,7 @@ class Client extends EventEmitter {
 
             await exposeFunctionIfAbsent(
                 this.pupPage,
-                'onAppStateHasSyncedEvent',
+                "onAppStateHasSyncedEvent",
                 async () => {
                     const authEventPayload =
                         await this.authStrategy.getAuthEventPayload();
@@ -299,12 +299,12 @@ class Client extends EventEmitter {
                     this.emit(Events.AUTHENTICATED, authEventPayload);
 
                     const injected = await this.pupPage.evaluate(async () => {
-                        return typeof window.WWebJS !== 'undefined';
+                        return typeof window.WWebJS !== "undefined";
                     });
 
                     if (!injected) {
                         if (
-                            this.options.webVersionCache.type === 'local' &&
+                            this.options.webVersionCache.type === "local" &&
                             this.currentIndexHtml
                         ) {
                             const { type: webCacheType, ...webCacheOptions } =
@@ -329,7 +329,7 @@ class Client extends EventEmitter {
                                 { timeout: 30000 },
                             )
                             .catch(() => {
-                                throw 'ready timeout';
+                                throw "ready timeout";
                             });
 
                         /**
@@ -341,14 +341,14 @@ class Client extends EventEmitter {
                             await this.pupPage.evaluate(() => {
                                 return {
                                     ...window
-                                        .require('WAWebConnModel')
+                                        .require("WAWebConnModel")
                                         .Conn.serialize(),
                                     wid:
                                         window
-                                            .require('WAWebUserPrefsMeUser')
+                                            .require("WAWebUserPrefsMeUser")
                                             .getMaybeMePnUser() ||
                                         window
-                                            .require('WAWebUserPrefsMeUser')
+                                            .require("WAWebUserPrefsMeUser")
                                             .getMaybeMeLidUser(),
                                 };
                             }),
@@ -369,64 +369,64 @@ class Client extends EventEmitter {
             let lastPercent = null;
             await exposeFunctionIfAbsent(
                 this.pupPage,
-                'onOfflineProgressUpdateEvent',
+                "onOfflineProgressUpdateEvent",
                 async (percent) => {
                     if (lastPercent !== percent) {
                         lastPercent = percent;
-                        this.emit(Events.LOADING_SCREEN, percent, 'WhatsApp'); // Message is hardcoded as "WhatsApp" for now
+                        this.emit(Events.LOADING_SCREEN, percent, "WhatsApp"); // Message is hardcoded as "WhatsApp" for now
                     }
                 },
             );
             await exposeFunctionIfAbsent(
                 this.pupPage,
-                'onLogoutEvent',
+                "onLogoutEvent",
                 async () => {
                     this.lastLoggedOut = true;
                     await this.pupPage
-                        .waitForNavigation({ waitUntil: 'load', timeout: 5000 })
+                        .waitForNavigation({ waitUntil: "load", timeout: 5000 })
                         .catch((_) => _);
                 },
             );
             await this.pupPage.evaluate(() => {
-                const Socket = window.require('WAWebSocketModel').Socket;
-                const Cmd = window.require('WAWebCmd').Cmd;
+                const Socket = window.require("WAWebSocketModel").Socket;
+                const Cmd = window.require("WAWebCmd").Cmd;
 
                 const listeners = [
                     [
                         Socket,
-                        'change:state',
+                        "change:state",
                         (_AppState, state) => {
                             window.onAuthAppStateChangedEvent(state);
                         },
                     ],
                     [
                         Socket,
-                        'change:hasSynced',
+                        "change:hasSynced",
                         () => {
                             window.onAppStateHasSyncedEvent();
                         },
                     ],
                     [
                         Cmd,
-                        'offline_progress_update_from_bridge',
+                        "offline_progress_update_from_bridge",
                         () => {
                             window.onOfflineProgressUpdateEvent(
                                 window
-                                    .require('WAWebOfflineHandler')
+                                    .require("WAWebOfflineHandler")
                                     .OfflineMessageHandler.getOfflineDeliveryProgress(),
                             );
                         },
                     ],
                     [
                         Cmd,
-                        'logout',
+                        "logout",
                         async () => {
                             await window.onLogoutEvent();
                         },
                     ],
                     [
                         Cmd,
-                        'logout_from_bridge',
+                        "logout_from_bridge",
                         async () => {
                             await window.onLogoutEvent();
                         },
@@ -448,7 +448,7 @@ class Client extends EventEmitter {
                 // Atomic hasSynced check in the same synchronous block as listener registration.
                 // If hasSynced is already true, Backbone won't fire change:hasSynced (no transition).
                 // If hasSynced is false, the listener above will catch the future transition.
-                const storeInjected = typeof window.WWebJS !== 'undefined';
+                const storeInjected = typeof window.WWebJS !== "undefined";
                 if (Socket.hasSynced === true && !storeInjected) {
                     window.onAppStateHasSyncedEvent();
                 }
@@ -492,12 +492,12 @@ class Client extends EventEmitter {
             const browserArgs = [...(puppeteerOpts.args || [])];
             if (
                 this.options.userAgent !== false &&
-                !browserArgs.find((arg) => arg.includes('--user-agent'))
+                !browserArgs.find((arg) => arg.includes("--user-agent"))
             ) {
                 browserArgs.push(`--user-agent=${this.options.userAgent}`);
             }
             // navigator.webdriver fix
-            browserArgs.push('--disable-blink-features=AutomationControlled');
+            browserArgs.push("--disable-blink-features=AutomationControlled");
 
             browser = await puppeteer.launch({
                 ...puppeteerOpts,
@@ -525,9 +525,9 @@ class Client extends EventEmitter {
         }
 
         await page.goto(WhatsWebURL, {
-            waitUntil: 'load',
+            waitUntil: "load",
             timeout: 0,
-            referer: 'https://whatsapp.com/',
+            referer: "https://whatsapp.com/",
         });
 
         // Register framenavigated BEFORE inject so that if navigation
@@ -541,14 +541,14 @@ class Client extends EventEmitter {
         if (this._framenavigatedRegistered) return;
         this._framenavigatedRegistered = true;
 
-        this.pupPage.on('framenavigated', async (frame) => {
+        this.pupPage.on("framenavigated", async (frame) => {
             if (frame.parentFrame() !== null) return;
 
             const isLogout =
-                frame.url().includes('post_logout=1') || this.lastLoggedOut;
+                frame.url().includes("post_logout=1") || this.lastLoggedOut;
 
             if (isLogout) {
-                this.emit(Events.DISCONNECTED, 'LOGOUT');
+                this.emit(Events.DISCONNECTED, "LOGOUT");
                 await this.authStrategy.logout();
                 await this.authStrategy.beforeBrowserInitialized();
                 await this.authStrategy.afterBrowserInitialized();
@@ -556,7 +556,7 @@ class Client extends EventEmitter {
             }
 
             const storeAvailable = await this.pupPage.evaluate(() => {
-                return typeof window.WWebJS !== 'undefined';
+                return typeof window.WWebJS !== "undefined";
             });
 
             if (!isLogout && storeAvailable) return;
@@ -579,7 +579,7 @@ class Client extends EventEmitter {
     ) {
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onCodeReceivedEvent',
+            "onCodeReceivedEvent",
             async (code) => {
                 this.emit(Events.CODE_RECEIVED, code);
                 return code;
@@ -589,13 +589,13 @@ class Client extends EventEmitter {
             async (phoneNumber, showNotification, intervalMs) => {
                 const getCode = async () => {
                     window
-                        .require('WAWebAltDeviceLinkingApi')
-                        .setPairingType('ALT_DEVICE_LINKING');
+                        .require("WAWebAltDeviceLinkingApi")
+                        .setPairingType("ALT_DEVICE_LINKING");
                     await window
-                        .require('WAWebAltDeviceLinkingApi')
+                        .require("WAWebAltDeviceLinkingApi")
                         .initializeAltDeviceLinking();
                     return window
-                        .require('WAWebAltDeviceLinkingApi')
+                        .require("WAWebAltDeviceLinkingApi")
                         .startAltLinkingFlow(phoneNumber, showNotification);
                 };
                 if (window.codeInterval) {
@@ -603,8 +603,8 @@ class Client extends EventEmitter {
                 }
                 window.codeInterval = setInterval(async () => {
                     const state =
-                        window.require('WAWebSocketModel').Socket.state;
-                    if (state != 'UNPAIRED' && state != 'UNPAIRED_IDLE') {
+                        window.require("WAWebSocketModel").Socket.state;
+                    if (state != "UNPAIRED" && state != "UNPAIRED_IDLE") {
                         clearInterval(window.codeInterval);
                         return;
                     }
@@ -627,9 +627,9 @@ class Client extends EventEmitter {
                 clearInterval(window.codeInterval);
                 window.codeInterval = undefined;
             }
-            window.require('WAWebLaunchSocketUtils').refreshQR();
+            window.require("WAWebLaunchSocketUtils").refreshQR();
             await window
-                .require('WAWebAltDeviceLinkingApi')
+                .require("WAWebAltDeviceLinkingApi")
                 .initializeQRLinking();
         });
     }
@@ -642,12 +642,12 @@ class Client extends EventEmitter {
     async attachEventListeners() {
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onAddMessageEvent',
+            "onAddMessageEvent",
             (msg) => {
-                if (msg.type === 'gp2') {
+                if (msg.type === "gp2") {
                     const notification = new GroupNotification(this, msg);
                     if (
-                        ['add', 'invite', 'linked_group_join'].includes(
+                        ["add", "invite", "linked_group_join"].includes(
                             msg.subtype,
                         )
                     ) {
@@ -658,8 +658,8 @@ class Client extends EventEmitter {
                          */
                         this.emit(Events.GROUP_JOIN, notification);
                     } else if (
-                        msg.subtype === 'remove' ||
-                        msg.subtype === 'leave'
+                        msg.subtype === "remove" ||
+                        msg.subtype === "leave"
                     ) {
                         /**
                          * Emitted when a user leaves the chat or is removed by an admin.
@@ -668,8 +668,8 @@ class Client extends EventEmitter {
                          */
                         this.emit(Events.GROUP_LEAVE, notification);
                     } else if (
-                        msg.subtype === 'promote' ||
-                        msg.subtype === 'demote'
+                        msg.subtype === "promote" ||
+                        msg.subtype === "demote"
                     ) {
                         /**
                          * Emitted when a current user is promoted to an admin or demoted to a regular user.
@@ -677,7 +677,7 @@ class Client extends EventEmitter {
                          * @param {GroupNotification} notification GroupNotification with more information about the action
                          */
                         this.emit(Events.GROUP_ADMIN_CHANGED, notification);
-                    } else if (msg.subtype === 'membership_approval_request') {
+                    } else if (msg.subtype === "membership_approval_request") {
                         /**
                          * Emitted when some user requested to join the group
                          * that has the membership approval mode turned on
@@ -726,9 +726,9 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onChangeMessageTypeEvent',
+            "onChangeMessageTypeEvent",
             (msg) => {
-                if (msg.type === 'revoked') {
+                if (msg.type === "revoked") {
                     const message = new Message(this, msg);
                     let revoked_msg;
                     if (last_message && msg.id.id === last_message.id.id) {
@@ -756,9 +756,9 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onChangeMessageEvent',
+            "onChangeMessageEvent",
             (msg) => {
-                if (msg.type !== 'revoked') {
+                if (msg.type !== "revoked") {
                     last_message = msg;
                 }
 
@@ -767,15 +767,15 @@ class Client extends EventEmitter {
                  * the group participants changes their phone number.
                  */
                 const isParticipant =
-                    msg.type === 'gp2' && msg.subtype === 'modify';
+                    msg.type === "gp2" && msg.subtype === "modify";
 
                 /**
                  * The event notification that is received when one of
                  * the contacts changes their phone number.
                  */
                 const isContact =
-                    msg.type === 'notification_template' &&
-                    msg.subtype === 'change_number';
+                    msg.type === "notification_template" &&
+                    msg.subtype === "change_number";
 
                 if (isParticipant || isContact) {
                     /** @type {GroupNotification} object does not provide enough information about this event, so a @type {Message} object is used. */
@@ -808,7 +808,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onRemoveMessageEvent',
+            "onRemoveMessageEvent",
             (msg) => {
                 if (!msg.isNewMsg) return;
 
@@ -825,7 +825,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onMessageAckEvent',
+            "onMessageAckEvent",
             (msg, ack) => {
                 const message = new Message(this, msg);
 
@@ -841,7 +841,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onChatUnreadCountEvent',
+            "onChatUnreadCountEvent",
             async (data) => {
                 const chat = await this.getChatById(data.id);
 
@@ -854,7 +854,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onMessageMediaUploadedEvent',
+            "onMessageMediaUploadedEvent",
             (msg) => {
                 const message = new Message(this, msg);
 
@@ -869,7 +869,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onAppStateChangedEvent',
+            "onAppStateChangedEvent",
             async (state) => {
                 /**
                  * Emitted when the connection state changes
@@ -892,7 +892,7 @@ class Client extends EventEmitter {
                         setTimeout(() => {
                             this.pupPage.evaluate(() =>
                                 window
-                                    .require('WAWebSocketModel')
+                                    .require("WAWebSocketModel")
                                     .Socket.takeover(),
                             );
                         }, this.options.takeoverTimeoutMs);
@@ -914,7 +914,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onBatteryStateChangedEvent',
+            "onBatteryStateChangedEvent",
             (state) => {
                 const { battery, plugged } = state;
 
@@ -932,7 +932,7 @@ class Client extends EventEmitter {
             },
         );
 
-        await exposeFunctionIfAbsent(this.pupPage, 'onIncomingCall', (call) => {
+        await exposeFunctionIfAbsent(this.pupPage, "onIncomingCall", (call) => {
             /**
              * Emitted when a call is received
              * @event Client#incoming_call
@@ -952,7 +952,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onReaction',
+            "onReaction",
             (reactions) => {
                 for (const reaction of reactions) {
                     /**
@@ -980,7 +980,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onRemoveChatEvent',
+            "onRemoveChatEvent",
             async (chat) => {
                 const _chat = await this.getChatById(chat.id);
 
@@ -995,7 +995,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onArchiveChatEvent',
+            "onArchiveChatEvent",
             async (chat, currState, prevState) => {
                 const _chat = await this.getChatById(chat.id);
 
@@ -1012,9 +1012,9 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onEditMessageEvent',
+            "onEditMessageEvent",
             (msg, newBody, prevBody) => {
-                if (msg.type === 'revoked') {
+                if (msg.type === "revoked") {
                     return;
                 }
                 /**
@@ -1035,7 +1035,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onAddMessageCiphertextEvent',
+            "onAddMessageCiphertextEvent",
             (msg) => {
                 /**
                  * Emitted when a message is received as ciphertext (not yet decrypted)
@@ -1048,7 +1048,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onCiphertextFailedEvent',
+            "onCiphertextFailedEvent",
             (msg) => {
                 /**
                  * Emitted when a ciphertext message failed to decrypt after recovery attempt
@@ -1064,7 +1064,7 @@ class Client extends EventEmitter {
 
         await exposeFunctionIfAbsent(
             this.pupPage,
-            'onPollVoteEvent',
+            "onPollVoteEvent",
             (votes) => {
                 for (const vote of votes) {
                     /**
@@ -1078,58 +1078,58 @@ class Client extends EventEmitter {
         );
 
         await this.pupPage.evaluate(() => {
-            const { Msg, Chat } = window.require('WAWebCollections');
-            const AppState = window.require('WAWebSocketModel').Socket;
+            const { Msg, Chat } = window.require("WAWebCollections");
+            const AppState = window.require("WAWebSocketModel").Socket;
 
             // Enable placeholder message resend (recovery for ciphertext messages)
-            const gatingUtils = window.require('WAWebSyncGatingUtils');
+            const gatingUtils = window.require("WAWebSyncGatingUtils");
             gatingUtils.isPlaceholderMessageResendEnabled = () => true;
 
-            Msg.on('change', (msg) => {
+            Msg.on("change", (msg) => {
                 window.onChangeMessageEvent(window.WWebJS.getMessageModel(msg));
             });
-            Msg.on('change:type', (msg) => {
+            Msg.on("change:type", (msg) => {
                 window.onChangeMessageTypeEvent(
                     window.WWebJS.getMessageModel(msg),
                 );
             });
-            Msg.on('change:ack', (msg, ack) => {
+            Msg.on("change:ack", (msg, ack) => {
                 window.onMessageAckEvent(
                     window.WWebJS.getMessageModel(msg),
                     ack,
                 );
             });
-            Msg.on('change:isUnsentMedia', (msg, unsent) => {
+            Msg.on("change:isUnsentMedia", (msg, unsent) => {
                 if (msg.id.fromMe && !unsent)
                     window.onMessageMediaUploadedEvent(
                         window.WWebJS.getMessageModel(msg),
                     );
             });
-            Msg.on('remove', (msg) => {
+            Msg.on("remove", (msg) => {
                 if (msg.isNewMsg)
                     window.onRemoveMessageEvent(
                         window.WWebJS.getMessageModel(msg),
                     );
             });
-            Msg.on('change:body change:caption', (msg, newBody, prevBody) => {
+            Msg.on("change:body change:caption", (msg, newBody, prevBody) => {
                 window.onEditMessageEvent(
                     window.WWebJS.getMessageModel(msg),
                     newBody,
                     prevBody,
                 );
             });
-            AppState.on('change:state', (_AppState, state) => {
+            AppState.on("change:state", (_AppState, state) => {
                 window.onAppStateChangedEvent(state);
             });
             window
-                .require('WAWebConnModel')
-                .Conn.on('change:battery', (state) => {
+                .require("WAWebConnModel")
+                .Conn.on("change:battery", (state) => {
                     window.onBatteryStateChangedEvent(state);
                 });
-            const WAWebCallCollection = window.require('WAWebCallCollection');
+            const WAWebCallCollection = window.require("WAWebCallCollection");
             if (
                 WAWebCallCollection &&
-                typeof WAWebCallCollection.on === 'function'
+                typeof WAWebCallCollection.on === "function"
             ) {
                 const mapKey = Object.keys(WAWebCallCollection).find(
                     (k) => WAWebCallCollection[k] instanceof Map,
@@ -1152,12 +1152,12 @@ class Client extends EventEmitter {
                     return originalMapSet(key, value);
                 };
             }
-            Chat.on('remove', async (chat) => {
+            Chat.on("remove", async (chat) => {
                 window.onRemoveChatEvent(
                     await window.WWebJS.getChatModel(chat),
                 );
             });
-            Chat.on('change:archive', async (chat, currState, prevState) => {
+            Chat.on("change:archive", async (chat, currState, prevState) => {
                 window.onArchiveChatEvent(
                     await window.WWebJS.getChatModel(chat),
                     currState,
@@ -1177,16 +1177,16 @@ class Client extends EventEmitter {
                     if (msgs.length === 0) return;
                     window
                         .require(
-                            'WAWebNonMessageDataRequestPlaceholderMessageResendUtils',
+                            "WAWebNonMessageDataRequestPlaceholderMessageResendUtils",
                         )
                         .handlePlaceholderMsgsSeen(msgs, true);
                 }, 5000);
             }
 
-            Msg.on('add', (msg) => {
+            Msg.on("add", (msg) => {
                 if (!msg.isNewMsg) return;
 
-                if (msg.type !== 'ciphertext') {
+                if (msg.type !== "ciphertext") {
                     window.onAddMessageEvent(
                         window.WWebJS.getMessageModel(msg),
                     );
@@ -1197,35 +1197,35 @@ class Client extends EventEmitter {
                     window.WWebJS.getMessageModel(msg),
                 );
 
-                if (msg.subtype && msg.subtype.endsWith('_unavailable_fanout'))
+                if (msg.subtype && msg.subtype.endsWith("_unavailable_fanout"))
                     return;
 
                 requestResend(msg);
 
                 const failTimer = setTimeout(() => {
-                    if (msg.type !== 'ciphertext') return;
+                    if (msg.type !== "ciphertext") return;
                     window.onCiphertextFailedEvent(
                         window.WWebJS.getMessageModel(msg),
                     );
                 }, 15000);
 
-                msg.once('change:type', (_msg) => {
+                msg.once("change:type", (_msg) => {
                     clearTimeout(failTimer);
                     pendingResend.delete(_msg);
-                    if (_msg.type === 'revoked') return;
+                    if (_msg.type === "revoked") return;
                     window.onAddMessageEvent(
                         window.WWebJS.getMessageModel(_msg),
                     );
                 });
             });
-            Chat.on('change:unreadCount', (chat) => {
+            Chat.on("change:unreadCount", (chat) => {
                 window.onChatUnreadCountEvent(chat);
             });
 
             window.WWebJS.injectToFunction(
                 {
-                    module: 'WAWebAddonReactionTableMode',
-                    function: 'reactionTableMode.bulkUpsert',
+                    module: "WAWebAddonReactionTableMode",
+                    function: "reactionTableMode.bulkUpsert",
                 },
                 (module, origFunction, ...args) => {
                     window.onReaction(
@@ -1252,8 +1252,8 @@ class Client extends EventEmitter {
 
             window.WWebJS.injectToFunction(
                 {
-                    module: 'WAWebAddonPollVoteTableMode',
-                    function: 'pollVoteTableMode.bulkUpsert',
+                    module: "WAWebAddonPollVoteTableMode",
+                    function: "pollVoteTableMode.bulkUpsert",
                 },
                 async (module, origFunction, ...args) => {
                     const votes = await Promise.all(
@@ -1307,11 +1307,11 @@ class Client extends EventEmitter {
 
         if (versionContent) {
             await this.pupPage.setRequestInterception(true);
-            this.pupPage.on('request', async (req) => {
+            this.pupPage.on("request", async (req) => {
                 if (req.url() === WhatsWebURL) {
                     req.respond({
                         status: 200,
-                        contentType: 'text/html',
+                        contentType: "text/html",
                         body: versionContent,
                     });
                 } else {
@@ -1319,7 +1319,7 @@ class Client extends EventEmitter {
                 }
             });
         } else {
-            this.pupPage.on('response', async (res) => {
+            this.pupPage.on("response", async (res) => {
                 if (res.ok() && res.url() === WhatsWebURL) {
                     const indexHtml = await res.text();
                     this.currentIndexHtml = indexHtml;
@@ -1348,7 +1348,7 @@ class Client extends EventEmitter {
      */
     async logout() {
         await this.pupPage.evaluate(() => {
-            return window.require('WAWebSocketModel').Socket.logout();
+            return window.require("WAWebSocketModel").Socket.logout();
         });
         await this.pupBrowser.close();
 
@@ -1376,8 +1376,8 @@ class Client extends EventEmitter {
         (deviceName || browserName) &&
             (await this.pupPage.evaluate(
                 (deviceName, browserName) => {
-                    const func = window.require('WAWebMiscBrowserUtils').info;
-                    window.require('WAWebMiscBrowserUtils').info = () => {
+                    const func = window.require("WAWebMiscBrowserUtils").info;
+                    window.require("WAWebMiscBrowserUtils").info = () => {
                         return {
                             ...func(),
                             ...(deviceName ? { os: deviceName } : {}),
@@ -1464,7 +1464,7 @@ class Client extends EventEmitter {
             ].includes(true)
         ) {
             console.warn(
-                'The message type is currently not supported for sending in channels,\nthe supported message types are: text, image, sticker, gif, video, voice and poll.',
+                "The message type is currently not supported for sending in channels,\nthe supported message types are: text, image, sticker, gif, video, voice and poll.",
             );
             return null;
         } else if (
@@ -1486,7 +1486,7 @@ class Client extends EventEmitter {
             ].includes(true)
         ) {
             console.warn(
-                'The message type is currently not supported for sending in status broadcast,\nthe supported message types are: text, image, gif, audio and video.',
+                "The message type is currently not supported for sending in status broadcast,\nthe supported message types are: text, image, gif, audio and video.",
             );
             return null;
         }
@@ -1500,7 +1500,7 @@ class Client extends EventEmitter {
                 )
             ) {
                 console.warn(
-                    'Mentions with an array of Contact are now deprecated. See more at https://github.com/wwebjssapp-web.js/pull/2166.',
+                    "Mentions with an array of Contact are now deprecated. See more at https://github.com/wwebjssapp-web.js/pull/2166.",
                 );
                 options.mentions = options.mentions.map(
                     (a) => a.id._serialized,
@@ -1535,23 +1535,23 @@ class Client extends EventEmitter {
 
         if (content instanceof MessageMedia) {
             internalOptions.media = content;
-            ((internalOptions.isViewOnce = options.isViewOnce), (content = ''));
+            (internalOptions.isViewOnce = options.isViewOnce), (content = "");
         } else if (options.media instanceof MessageMedia) {
             internalOptions.media = options.media;
             internalOptions.caption = content;
-            ((internalOptions.isViewOnce = options.isViewOnce), (content = ''));
+            (internalOptions.isViewOnce = options.isViewOnce), (content = "");
         } else if (content instanceof Location) {
             internalOptions.location = content;
-            content = '';
+            content = "";
         } else if (content instanceof Poll) {
             internalOptions.poll = content;
-            content = '';
+            content = "";
         } else if (content instanceof ScheduledEvent) {
             internalOptions.event = content;
-            content = '';
+            content = "";
         } else if (content instanceof Contact) {
             internalOptions.contactCard = content.id._serialized;
-            content = '';
+            content = "";
         } else if (
             Array.isArray(content) &&
             content.length > 0 &&
@@ -1560,22 +1560,22 @@ class Client extends EventEmitter {
             internalOptions.contactCardList = content.map(
                 (contact) => contact.id._serialized,
             );
-            content = '';
+            content = "";
         } else if (content instanceof Buttons) {
             console.warn(
-                'Buttons are now deprecated. See more at https://www.youtube.com/watch?v=hv1R1rLeVVE.',
+                "Buttons are now deprecated. See more at https://www.youtube.com/watch?v=hv1R1rLeVVE.",
             );
-            if (content.type !== 'chat') {
+            if (content.type !== "chat") {
                 internalOptions.attachment = content.body;
             }
             internalOptions.buttons = content;
-            content = '';
+            content = "";
         } else if (content instanceof List) {
             console.warn(
-                'Lists are now deprecated. See more at https://www.youtube.com/watch?v=hv1R1rLeVVE.',
+                "Lists are now deprecated. See more at https://www.youtube.com/watch?v=hv1R1rLeVVE.",
             );
             internalOptions.list = content;
-            content = '';
+            content = "";
         }
 
         if (internalOptions.sendMediaAsSticker && internalOptions.media) {
@@ -1625,15 +1625,15 @@ class Client extends EventEmitter {
             async (messageId, reaction) => {
                 if (!messageId) return null;
                 const msg =
-                    window.require('WAWebCollections').Msg.get(messageId) ||
+                    window.require("WAWebCollections").Msg.get(messageId) ||
                     (
                         await window
-                            .require('WAWebCollections')
+                            .require("WAWebCollections")
                             .Msg.getMessagesById([messageId])
                     )?.messages?.[0];
                 if (!msg) return null;
                 await window
-                    .require('WAWebSendReactionMsgAction')
+                    .require("WAWebSendReactionMsgAction")
                     .sendReactionToMsg(msg, reaction);
             },
             messageId,
@@ -1656,13 +1656,13 @@ class Client extends EventEmitter {
     async sendChannelAdminInvite(chatId, channelId, options = {}) {
         const response = await this.pupPage.evaluate(
             async (chatId, channelId, options) => {
-                const { createWid } = window.require('WAWebWidFactory');
+                const { createWid } = window.require("WAWebWidFactory");
                 const channelWid = createWid(channelId);
                 const chatWid = createWid(chatId);
                 const chat =
-                    window.require('WAWebCollections').Chat.get(chatWid) ||
+                    window.require("WAWebCollections").Chat.get(chatWid) ||
                     (await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Chat.find(chatWid));
 
                 if (!chatWid.isUser()) {
@@ -1670,7 +1670,7 @@ class Client extends EventEmitter {
                 }
 
                 return await window
-                    .require('WAWebNewsletterSendMsgAction')
+                    .require("WAWebNewsletterSendMsgAction")
                     .sendNewsletterAdminInviteMessage(chat, {
                         newsletterWid: channelWid,
                         invitee: chatWid,
@@ -1686,7 +1686,7 @@ class Client extends EventEmitter {
             options,
         );
 
-        return response.messageSendResult === 'OK';
+        return response.messageSendResult === "OK";
     }
 
     /**
@@ -1702,7 +1702,7 @@ class Client extends EventEmitter {
         const messages = await this.pupPage.evaluate(
             async (query, page, count, remote) => {
                 const { messages } = await window
-                    .require('WAWebCollections')
+                    .require("WAWebCollections")
                     .Msg.search(query, page, count, remote);
                 return messages.map((msg) =>
                     window.WWebJS.getMessageModel(msg),
@@ -1747,10 +1747,14 @@ class Client extends EventEmitter {
      * @returns {Promise<Chat|Channel>}
      */
     async getChatById(chatId) {
-        const chat = await this.pupPage.evaluate(async (chatId) => {
-            return await window.WWebJS.getChat(chatId);
-        }, chatId);
-        return chat ? ChatFactory.create(this, chat) : undefined;
+        try {
+            const chat = await this.pupPage.evaluate(async (chatId) => {
+                return await window.WWebJS.getChat(chatId);
+            }, chatId);
+            return chat ? ChatFactory.create(this, chat) : undefined;
+        } catch {
+            return undefined;
+        }
     }
 
     /**
@@ -1765,7 +1769,7 @@ class Client extends EventEmitter {
                 channelMetadata =
                     await window.WWebJS.getChannelMetadata(inviteCode);
             } catch (err) {
-                if (err.name === 'ServerStatusCodeError') return null;
+                if (err.name === "ServerStatusCodeError") return null;
                 throw err;
             }
             return await window.WWebJS.getChat(channelMetadata.id);
@@ -1806,15 +1810,15 @@ class Client extends EventEmitter {
      */
     async getMessageById(messageId) {
         const msg = await this.pupPage.evaluate(async (messageId) => {
-            let msg = window.require('WAWebCollections').Msg.get(messageId);
+            let msg = window.require("WAWebCollections").Msg.get(messageId);
             if (msg) return window.WWebJS.getMessageModel(msg);
 
-            const params = messageId.split('_');
+            const params = messageId.split("_");
             if (params.length !== 3 && params.length !== 4)
-                throw new Error('Invalid serialized message id specified');
+                throw new Error("Invalid serialized message id specified");
 
             let messagesObject = await window
-                .require('WAWebCollections')
+                .require("WAWebCollections")
                 .Msg.getMessagesById([messageId]);
             if (messagesObject && messagesObject.messages.length)
                 msg = messagesObject.messages[0];
@@ -1833,16 +1837,16 @@ class Client extends EventEmitter {
      */
     async getPinnedMessages(chatId) {
         const pinnedMsgs = await this.pupPage.evaluate(async (chatId) => {
-            const chatWid = window.require('WAWebWidFactory').createWid(chatId);
+            const chatWid = window.require("WAWebWidFactory").createWid(chatId);
             const chat =
-                window.require('WAWebCollections').Chat.get(chatWid) ??
-                (await window.require('WAWebCollections').Chat.find(chatWid));
+                window.require("WAWebCollections").Chat.get(chatWid) ??
+                (await window.require("WAWebCollections").Chat.find(chatWid));
             if (!chat) return [];
 
             const msgs = await window
-                .require('WAWebPinInChatSchema')
+                .require("WAWebPinInChatSchema")
                 .getTable()
-                .equals(['chatId'], chatWid.toString());
+                .equals(["chatId"], chatWid.toString());
 
             const pinnedMsgs = (
                 await Promise.all(
@@ -1850,7 +1854,7 @@ class Client extends EventEmitter {
                         .filter((msg) => msg.pinType == 1)
                         .map(async (msg) => {
                             const res = await window
-                                .require('WAWebCollections')
+                                .require("WAWebCollections")
                                 .Msg.getMessagesById([msg.parentMsgKey]);
                             return res?.messages?.[0];
                         }),
@@ -1877,7 +1881,7 @@ class Client extends EventEmitter {
     async getInviteInfo(inviteCode) {
         return await this.pupPage.evaluate((inviteCode) => {
             return window
-                .require('WAWebGroupQueryJob')
+                .require("WAWebGroupQueryJob")
                 .queryGroupInvite(inviteCode);
         }, inviteCode);
     }
@@ -1890,7 +1894,7 @@ class Client extends EventEmitter {
     async acceptInvite(inviteCode) {
         const res = await this.pupPage.evaluate(async (inviteCode) => {
             return await window
-                .require('WAWebGroupInviteJob')
+                .require("WAWebGroupInviteJob")
                 .joinGroupViaInvite(inviteCode);
         }, inviteCode);
 
@@ -1906,11 +1910,11 @@ class Client extends EventEmitter {
         return await this.pupPage.evaluate(async (channelId) => {
             try {
                 await window
-                    .require('WAWebMexAcceptNewsletterAdminInviteJob')
+                    .require("WAWebMexAcceptNewsletterAdminInviteJob")
                     .acceptNewsletterAdminInvite(channelId);
                 return true;
             } catch (err) {
-                if (err.name === 'ServerStatusCodeError') return false;
+                if (err.name === "ServerStatusCodeError") return false;
                 throw err;
             }
         }, channelId);
@@ -1927,14 +1931,14 @@ class Client extends EventEmitter {
             async (channelId, userId) => {
                 try {
                     const userWid = window
-                        .require('WAWebWidFactory')
+                        .require("WAWebWidFactory")
                         .createWid(userId);
                     await window
-                        .require('WAWebMexRevokeNewsletterAdminInviteJob')
+                        .require("WAWebMexRevokeNewsletterAdminInviteJob")
                         .revokeNewsletterAdminInvite(channelId, userWid);
                     return true;
                 } catch (err) {
-                    if (err.name === 'ServerStatusCodeError') return false;
+                    if (err.name === "ServerStatusCodeError") return false;
                     throw err;
                 }
             },
@@ -1954,14 +1958,14 @@ class Client extends EventEmitter {
             async (channelId, userId) => {
                 try {
                     const userWid = window
-                        .require('WAWebWidFactory')
+                        .require("WAWebWidFactory")
                         .createWid(userId);
                     await window
-                        .require('WAWebDemoteNewsletterAdminAction')
+                        .require("WAWebDemoteNewsletterAdminAction")
                         .demoteNewsletterAdmin(channelId, userWid);
                     return true;
                 } catch (err) {
-                    if (err.name === 'ServerStatusCodeError') return false;
+                    if (err.name === "ServerStatusCodeError") return false;
                     throw err;
                 }
             },
@@ -1977,13 +1981,13 @@ class Client extends EventEmitter {
      */
     async acceptGroupV4Invite(inviteInfo) {
         if (!inviteInfo.inviteCode)
-            throw 'Invalid invite code, try passing the message.inviteV4 object';
-        if (inviteInfo.inviteCodeExp == 0) throw 'Expired invite code';
+            throw "Invalid invite code, try passing the message.inviteV4 object";
+        if (inviteInfo.inviteCodeExp == 0) throw "Expired invite code";
         return this.pupPage.evaluate(async (inviteInfo) => {
             let { groupId, fromId, inviteCode, inviteCodeExp } = inviteInfo;
-            let userWid = window.require('WAWebWidFactory').createWid(fromId);
+            let userWid = window.require("WAWebWidFactory").createWid(fromId);
             return await window
-                .require('WAWebGroupInviteV4Job')
+                .require("WAWebGroupInviteV4Job")
                 .joinGroupViaInviteV4(
                     inviteCode,
                     String(inviteCodeExp),
@@ -2000,7 +2004,7 @@ class Client extends EventEmitter {
     async setStatus(status) {
         await this.pupPage.evaluate(async (status) => {
             return await window
-                .require('WAWebContactStatusBridge')
+                .require("WAWebContactStatusBridge")
                 .setMyStatus(status);
         }, status);
     }
@@ -2013,10 +2017,10 @@ class Client extends EventEmitter {
      */
     async setDisplayName(displayName) {
         const couldSet = await this.pupPage.evaluate(async (displayName) => {
-            if (!window.require('WAWebConnModel').Conn.canSetMyPushname())
+            if (!window.require("WAWebConnModel").Conn.canSetMyPushname())
                 return false;
             await window
-                .require('WAWebSetPushnameConnAction')
+                .require("WAWebSetPushnameConnAction")
                 .setPushname(displayName);
             return true;
         }, displayName);
@@ -2030,7 +2034,7 @@ class Client extends EventEmitter {
      */
     async getState() {
         return await this.pupPage.evaluate(() => {
-            return window.require('WAWebSocketModel').Socket.state ?? null;
+            return window.require("WAWebSocketModel").Socket.state ?? null;
         });
     }
 
@@ -2040,7 +2044,7 @@ class Client extends EventEmitter {
     async sendPresenceAvailable() {
         return await this.pupPage.evaluate(() => {
             return window
-                .require('WAWebPresenceChatAction')
+                .require("WAWebPresenceChatAction")
                 .sendPresenceAvailable();
         });
     }
@@ -2051,7 +2055,7 @@ class Client extends EventEmitter {
     async sendPresenceUnavailable() {
         return await this.pupPage.evaluate(() => {
             return window
-                .require('WAWebPresenceChatAction')
+                .require("WAWebPresenceChatAction")
                 .sendPresenceUnavailable();
         });
     }
@@ -2065,7 +2069,7 @@ class Client extends EventEmitter {
             let chat = await window.WWebJS.getChat(chatId, {
                 getAsModel: false,
             });
-            await window.require('WAWebCmd').Cmd.archiveChat(chat, true);
+            await window.require("WAWebCmd").Cmd.archiveChat(chat, true);
             return true;
         }, chatId);
     }
@@ -2079,7 +2083,7 @@ class Client extends EventEmitter {
             let chat = await window.WWebJS.getChat(chatId, {
                 getAsModel: false,
             });
-            await window.require('WAWebCmd').Cmd.archiveChat(chat, false);
+            await window.require("WAWebCmd").Cmd.archiveChat(chat, false);
             return false;
         }, chatId);
     }
@@ -2098,7 +2102,7 @@ class Client extends EventEmitter {
             }
             const MAX_PIN_COUNT = 3;
             const chatModels = window
-                .require('WAWebCollections')
+                .require("WAWebCollections")
                 .Chat.getModelsArray();
             if (chatModels.length > MAX_PIN_COUNT) {
                 let maxPinned = chatModels[MAX_PIN_COUNT - 1].pin;
@@ -2106,7 +2110,7 @@ class Client extends EventEmitter {
                     return false;
                 }
             }
-            await window.require('WAWebCmd').Cmd.pinChat(chat, true);
+            await window.require("WAWebCmd").Cmd.pinChat(chat, true);
             return true;
         }, chatId);
     }
@@ -2123,7 +2127,7 @@ class Client extends EventEmitter {
             if (!chat.pin) {
                 return false;
             }
-            await window.require('WAWebCmd').Cmd.pinChat(chat, false);
+            await window.require("WAWebCmd").Cmd.pinChat(chat, false);
             return false;
         }, chatId);
     }
@@ -2136,7 +2140,7 @@ class Client extends EventEmitter {
      */
     async muteChat(chatId, unmuteDate) {
         unmuteDate = unmuteDate ? Math.floor(unmuteDate.getTime() / 1000) : -1;
-        return this._muteUnmuteChat(chatId, 'MUTE', unmuteDate);
+        return this._muteUnmuteChat(chatId, "MUTE", unmuteDate);
     }
 
     /**
@@ -2145,7 +2149,7 @@ class Client extends EventEmitter {
      * @returns {Promise<{isMuted: boolean, muteExpiration: number}>}
      */
     async unmuteChat(chatId) {
-        return this._muteUnmuteChat(chatId, 'UNMUTE');
+        return this._muteUnmuteChat(chatId, "UNMUTE");
     }
 
     /**
@@ -2159,11 +2163,11 @@ class Client extends EventEmitter {
         return this.pupPage.evaluate(
             async (chatId, action, unmuteDateTs) => {
                 const chat =
-                    window.require('WAWebCollections').Chat.get(chatId) ??
+                    window.require("WAWebCollections").Chat.get(chatId) ??
                     (await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Chat.find(chatId));
-                action === 'MUTE'
+                action === "MUTE"
                     ? await chat.mute.mute({
                           expiration: unmuteDateTs,
                           sendDevice: true,
@@ -2189,7 +2193,7 @@ class Client extends EventEmitter {
             let chat = await window.WWebJS.getChat(chatId, {
                 getAsModel: false,
             });
-            await window.require('WAWebCmd').Cmd.markChatUnread(chat, true);
+            await window.require("WAWebCmd").Cmd.markChatUnread(chat, true);
         }, chatId);
     }
 
@@ -2203,10 +2207,10 @@ class Client extends EventEmitter {
             try {
                 const chat = await window.WWebJS.getChat(contactId);
                 return await window
-                    .require('WAWebContactProfilePicThumbBridge')
+                    .require("WAWebContactProfilePicThumbBridge")
                     .requestProfilePicFromServer(chat);
             } catch (err) {
-                if (err.name === 'ServerStatusCodeError') return undefined;
+                if (err.name === "ServerStatusCodeError") return undefined;
                 throw err;
             }
         }, contactId);
@@ -2222,14 +2226,14 @@ class Client extends EventEmitter {
     async getCommonGroups(contactId) {
         const commonGroups = await this.pupPage.evaluate(async (contactId) => {
             let contact = window
-                .require('WAWebCollections')
+                .require("WAWebCollections")
                 .Contact.get(contactId);
             if (!contact) {
                 const wid = window
-                    .require('WAWebWidFactory')
+                    .require("WAWebWidFactory")
                     .createWid(contactId);
                 const chatConstructor = window
-                    .require('WAWebCollections')
+                    .require("WAWebCollections")
                     .Contact.getModelsArray()
                     .find((c) => !c.isGroup).constructor;
                 contact = new chatConstructor({ id: wid });
@@ -2239,7 +2243,7 @@ class Client extends EventEmitter {
                 return contact.commonGroups.serialize();
             }
             const status = await window
-                .require('WAWebFindCommonGroupsContactAction')
+                .require("WAWebFindCommonGroupsContactAction")
                 .findCommonGroups(contact);
             if (status) {
                 return contact.commonGroups.serialize();
@@ -2258,7 +2262,7 @@ class Client extends EventEmitter {
      */
     async resetState() {
         await this.pupPage.evaluate(() => {
-            window.require('WAWebSocketModel').Socket.reconnect();
+            window.require("WAWebSocketModel").Socket.reconnect();
         });
     }
 
@@ -2278,14 +2282,14 @@ class Client extends EventEmitter {
      * @returns {Promise<Object|null>}
      */
     async getNumberId(number) {
-        if (!number.endsWith('@c.us')) {
-            number += '@c.us';
+        if (!number.endsWith("@c.us")) {
+            number += "@c.us";
         }
 
         return await this.pupPage.evaluate(async (number) => {
-            const wid = window.require('WAWebWidFactory').createWid(number);
+            const wid = window.require("WAWebWidFactory").createWid(number);
             const result = await window
-                .require('WAWebQueryExistsJob')
+                .require("WAWebQueryExistsJob")
                 .queryWidExists(wid);
             if (!result || result.wid === undefined) return null;
             return result.wid;
@@ -2298,14 +2302,14 @@ class Client extends EventEmitter {
      * @returns {Promise<string>}
      */
     async getFormattedNumber(number) {
-        if (!number.endsWith('@s.whatsapp.net'))
-            number = number.replace('c.us', 's.whatsapp.net');
-        if (!number.includes('@s.whatsapp.net'))
+        if (!number.endsWith("@s.whatsapp.net"))
+            number = number.replace("c.us", "s.whatsapp.net");
+        if (!number.includes("@s.whatsapp.net"))
             number = `${number}@s.whatsapp.net`;
 
         return await this.pupPage.evaluate(async (numberId) => {
             return window
-                .require('WAWebPhoneUtils')
+                .require("WAWebPhoneUtils")
                 .formattedPhoneNumber(numberId);
         }, number);
     }
@@ -2316,10 +2320,10 @@ class Client extends EventEmitter {
      * @returns {Promise<string>}
      */
     async getCountryCode(number) {
-        number = number.replace(' ', '').replace('+', '').replace('@c.us', '');
+        number = number.replace(" ", "").replace("+", "").replace("@c.us", "");
 
         return await this.pupPage.evaluate(async (numberId) => {
-            return window.require('WAPhoneFindCC').findCC(numberId);
+            return window.require("WAPhoneFindCC").findCC(numberId);
         }, number);
     }
 
@@ -2373,7 +2377,7 @@ class Client extends EventEmitter {
                     messageTimer = 0,
                     parentGroupId,
                     autoSendInviteV4 = true,
-                    comment = '',
+                    comment = "",
                 } = options;
                 const participantData = {},
                     participantWids = [],
@@ -2382,20 +2386,20 @@ class Client extends EventEmitter {
 
                 const addParticipantResultCodes = {
                     default:
-                        'An unknown error occupied while adding a participant',
-                    200: 'The participant was added successfully',
-                    403: 'The participant can be added by sending private invitation only',
-                    404: 'The phone number is not registered on WhatsApp',
+                        "An unknown error occupied while adding a participant",
+                    200: "The participant was added successfully",
+                    403: "The participant can be added by sending private invitation only",
+                    404: "The phone number is not registered on WhatsApp",
                 };
 
                 for (const participant of participants) {
                     const pWid = window
-                        .require('WAWebWidFactory')
+                        .require("WAWebWidFactory")
                         .createWid(participant);
                     if (
                         (
                             await window
-                                .require('WAWebQueryExistsJob')
+                                .require("WAWebQueryExistsJob")
                                 .queryWidExists(pWid)
                         )?.wid
                     ) {
@@ -2405,15 +2409,15 @@ class Client extends EventEmitter {
 
                 parentGroupId &&
                     (parentGroupWid = window
-                        .require('WAWebWidFactory')
+                        .require("WAWebWidFactory")
                         .createWid(parentGroupId));
 
                 try {
                     createGroupResult = await window
-                        .require('WAWebGroupCreateJob')
+                        .require("WAWebGroupCreateJob")
                         .createGroup(
                             {
-                                addressingModeOverride: 'lid',
+                                addressingModeOverride: "lid",
                                 memberAddMode: options.memberAddMode ?? false,
                                 membershipApprovalMode:
                                     options.membershipApprovalMode ?? false,
@@ -2429,30 +2433,30 @@ class Client extends EventEmitter {
                             participantWids,
                         );
                 } catch (ignoredError) {
-                    return 'CreateGroupError: An unknown error occupied while creating a group';
+                    return "CreateGroupError: An unknown error occupied while creating a group";
                 }
 
                 for (const participant of createGroupResult.participants) {
                     let isInviteV4Sent = false;
-                    participant.wid.server == 'lid' &&
+                    participant.wid.server == "lid" &&
                         (participant.wid = window
-                            .require('WAWebApiContact')
+                            .require("WAWebApiContact")
                             .getPhoneNumber(participant.wid));
                     const participantId = participant.wid._serialized;
                     const statusCode = participant.error || 200;
 
                     if (autoSendInviteV4 && statusCode === 403) {
                         window
-                            .require('WAWebCollections')
+                            .require("WAWebCollections")
                             .Contact.gadd(participant.wid, { silent: true });
                         const addParticipantResult = await window
-                            .require('WAWebChatSendMessages')
+                            .require("WAWebChatSendMessages")
                             .sendGroupInviteMessage(
                                 window
-                                    .require('WAWebCollections')
+                                    .require("WAWebCollections")
                                     .Chat.get(participant.wid) ||
                                     (await window
-                                        .require('WAWebCollections')
+                                        .require("WAWebCollections")
                                         .Chat.find(participant.wid)),
                                 createGroupResult.wid._serialized,
                                 createGroupResult.subject,
@@ -2464,7 +2468,7 @@ class Client extends EventEmitter {
                                 ),
                             );
                         isInviteV4Sent =
-                            addParticipantResult.messageSendResult === 'OK';
+                            addParticipantResult.messageSendResult === "OK";
                     }
 
                     participantData[participantId] = {
@@ -2472,7 +2476,7 @@ class Client extends EventEmitter {
                         message:
                             addParticipantResultCodes[statusCode] ||
                             addParticipantResultCodes.default,
-                        isGroupCreator: participant.type === 'superadmin',
+                        isGroupCreator: participant.type === "superadmin",
                         isInviteV4Sent: isInviteV4Sent,
                     };
                 }
@@ -2531,16 +2535,16 @@ class Client extends EventEmitter {
 
                 if (
                     !window
-                        .require('WAWebNewsletterGatingUtils')
+                        .require("WAWebNewsletterGatingUtils")
                         .isNewsletterCreationEnabled()
                 ) {
-                    return 'CreateChannelError: A channel creation is not enabled';
+                    return "CreateChannelError: A channel creation is not enabled";
                 }
 
                 if (picture) {
                     picture = await window.WWebJS.cropAndResizeImage(picture, {
                         asDataUrl: true,
-                        mimetype: 'image/jpeg',
+                        mimetype: "image/jpeg",
                         size: 640,
                         quality: 1,
                     });
@@ -2548,15 +2552,15 @@ class Client extends EventEmitter {
 
                 try {
                     response = await window
-                        .require('WAWebNewsletterCreateQueryJob')
+                        .require("WAWebNewsletterCreateQueryJob")
                         .createNewsletterQuery({
                             name: title,
                             description: description,
                             picture: picture,
                         });
                 } catch (err) {
-                    if (err.name === 'ServerStatusCodeError') {
-                        return 'CreateChannelError: An error occupied while creating a channel';
+                    if (err.name === "ServerStatusCodeError") {
+                        return "CreateChannelError: An error occupied while creating a channel";
                     }
                     throw err;
                 }
@@ -2564,7 +2568,7 @@ class Client extends EventEmitter {
                 return {
                     title: title,
                     nid: window
-                        .require('WAWebJidToWid')
+                        .require("WAWebJidToWid")
                         .newsletterJidToWid(response.idJid),
                     inviteLink: `https://whatsapp.com/channel/${response.newsletterInviteLinkMetadataMixin.inviteCode}`,
                     createdAtTs:
@@ -2586,7 +2590,7 @@ class Client extends EventEmitter {
         return await this.pupPage.evaluate(async (channelId) => {
             return await window.WWebJS.subscribeToUnsubscribeFromChannel(
                 channelId,
-                'Subscribe',
+                "Subscribe",
             );
         }, channelId);
     }
@@ -2608,7 +2612,7 @@ class Client extends EventEmitter {
             async (channelId, options) => {
                 return await window.WWebJS.subscribeToUnsubscribeFromChannel(
                     channelId,
-                    'Unsubscribe',
+                    "Unsubscribe",
                     options,
                 );
             },
@@ -2639,29 +2643,29 @@ class Client extends EventEmitter {
                 });
                 const newOwner =
                     window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Contact.get(newOwnerId) ||
                     (await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Contact.find(newOwnerId));
                 if (!channel.newsletterMetadata) {
                     await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .NewsletterMetadataCollection.update(channel.id);
                 }
 
                 try {
                     await window
-                        .require('WAWebChangeNewsletterOwnerAction')
+                        .require("WAWebChangeNewsletterOwnerAction")
                         .changeNewsletterOwnerAction(channel, newOwner);
 
                     if (options.shouldDismissSelfAsAdmin) {
                         const meContact = window
-                            .require('WAWebContactCollection')
+                            .require("WAWebContactCollection")
                             .getMeContact();
                         meContact &&
                             (await window
-                                .require('WAWebNewsletterDemoteAdminJob')
+                                .require("WAWebNewsletterDemoteAdminJob")
                                 .demoteNewsletterAdminAction(
                                     channel,
                                     meContact,
@@ -2701,19 +2705,19 @@ class Client extends EventEmitter {
     async searchChannels(searchOptions = {}) {
         return await this.pupPage.evaluate(
             async ({
-                searchText = '',
+                searchText = "",
                 countryCodes = [],
                 skipSubscribedNewsletters = false,
                 view = 0,
                 limit = 50,
             }) => {
                 searchText = searchText.trim();
-                const currentRegion = window.require('WAWebL10N').getRegion();
+                const currentRegion = window.require("WAWebL10N").getRegion();
                 if (countryCodes.length === 0) countryCodes[0] = currentRegion;
                 if (![0, 1, 2, 3].includes(view)) view = 0;
 
                 const { countryCodesIso } = window.require(
-                    'WAWebCountriesNativeCountryNames',
+                    "WAWebCountriesNativeCountryNames",
                 );
 
                 countryCodes =
@@ -2725,10 +2729,10 @@ class Client extends EventEmitter {
                           );
 
                 const viewTypeMapping = {
-                    0: 'RECOMMENDED',
-                    1: 'TRENDING',
-                    2: 'POPULAR',
-                    3: 'NEW',
+                    0: "RECOMMENDED",
+                    1: "TRENDING",
+                    2: "POPULAR",
+                    3: "NEW",
                 };
 
                 searchOptions = {
@@ -2737,26 +2741,26 @@ class Client extends EventEmitter {
                     skipSubscribedNewsletters: skipSubscribedNewsletters,
                     view: viewTypeMapping[view],
                     categories: [],
-                    cursorToken: '',
+                    cursorToken: "",
                 };
 
                 const originalFunction = window.require(
-                    'WAWebNewsletterGatingUtils',
+                    "WAWebNewsletterGatingUtils",
                 ).getNewsletterDirectoryPageSize;
                 limit !== 50 &&
                     (window.require(
-                        'WAWebNewsletterGatingUtils',
+                        "WAWebNewsletterGatingUtils",
                     ).getNewsletterDirectoryPageSize = () => limit);
 
                 const channels = (
                     await window
-                        .require('WAWebNewsletterDirectorySearchAction')
+                        .require("WAWebNewsletterDirectorySearchAction")
                         .fetchNewsletterDirectories(searchOptions)
                 ).newsletters;
 
                 limit !== 50 &&
                     (window.require(
-                        'WAWebNewsletterGatingUtils',
+                        "WAWebNewsletterGatingUtils",
                     ).getNewsletterDirectoryPageSize = originalFunction);
 
                 return channels
@@ -2786,11 +2790,11 @@ class Client extends EventEmitter {
             if (!channel) return false;
             try {
                 await window
-                    .require('WAWebNewsletterDeleteAction')
+                    .require("WAWebNewsletterDeleteAction")
                     .deleteNewsletterAction(channel);
                 return true;
             } catch (err) {
-                if (err.name === 'ServerStatusCodeError') return false;
+                if (err.name === "ServerStatusCodeError") return false;
                 throw err;
             }
         }, channelId);
@@ -2828,10 +2832,10 @@ class Client extends EventEmitter {
         const broadcast = await this.pupPage.evaluate(async (userId) => {
             let status;
             try {
-                status = window.require('WAWebCollections').Status.get(userId);
+                status = window.require("WAWebCollections").Status.get(userId);
                 if (!status) {
                     status = await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Status.find(userId);
                 }
             } catch {
@@ -2851,24 +2855,24 @@ class Client extends EventEmitter {
     async revokeStatusMessage(messageId) {
         return await this.pupPage.evaluate(async (msgId) => {
             const status = window
-                .require('WAWebCollections')
+                .require("WAWebCollections")
                 .Status.getMyStatus();
             if (!status) return;
 
             const msg =
-                window.require('WAWebCollections').Msg.get(msgId) ||
+                window.require("WAWebCollections").Msg.get(msgId) ||
                 (
                     await window
-                        .require('WAWebCollections')
+                        .require("WAWebCollections")
                         .Msg.getMessagesById([msgId])
                 )?.messages?.[0];
             if (!msg) return;
 
             if (!msg.id.fromMe || !msg.id.remote.isStatus())
-                throw 'Invalid usage! Can only revoke the message its from own status broadcast';
+                throw "Invalid usage! Can only revoke the message its from own status broadcast";
 
             return await window
-                .require('WAWebRevokeStatusAction')
+                .require("WAWebRevokeStatusAction")
                 .sendStatusRevokeMsgAction(status, msg);
         }, messageId);
     }
@@ -2906,10 +2910,10 @@ class Client extends EventEmitter {
      */
     async getChatsByLabelId(labelId) {
         const chatIds = await this.pupPage.evaluate(async (labelId) => {
-            const label = window.require('WAWebCollections').Label.get(labelId);
+            const label = window.require("WAWebCollections").Label.get(labelId);
             const labelItems = label.labelItemCollection.getModelsArray();
             return labelItems.reduce((result, item) => {
-                if (item.parentType === 'Chat') {
+                if (item.parentType === "Chat") {
                     result.push(item.parentId);
                 }
                 return result;
@@ -2926,7 +2930,7 @@ class Client extends EventEmitter {
     async getBlockedContacts() {
         const blockedContacts = await this.pupPage.evaluate(() => {
             let chatIds = window
-                .require('WAWebCollections')
+                .require("WAWebCollections")
                 .Blocklist.getModelsArray()
                 .map((a) => a.id._serialized);
             return Promise.all(
@@ -2978,34 +2982,34 @@ class Client extends EventEmitter {
         return this.pupPage.evaluate(
             async (labelIds, chatIds) => {
                 if (
-                    ['smba', 'smbi'].indexOf(
-                        window.require('WAWebConnModel').Conn.platform,
+                    ["smba", "smbi"].indexOf(
+                        window.require("WAWebConnModel").Conn.platform,
                     ) === -1
                 ) {
-                    throw '[LT01] Only Whatsapp business';
+                    throw "[LT01] Only Whatsapp business";
                 }
                 const labels = window.WWebJS.getLabels().filter(
                     (e) => labelIds.find((l) => l == e.id) !== undefined,
                 );
                 const chats = window
-                    .require('WAWebCollections')
+                    .require("WAWebCollections")
                     .Chat.filter((e) => chatIds.includes(e.id._serialized));
 
                 let actions = labels.map((label) => ({
                     id: label.id,
-                    type: 'add',
+                    type: "add",
                 }));
 
                 chats.forEach((chat) => {
                     (chat.labels || []).forEach((n) => {
                         if (!actions.find((e) => e.id == n)) {
-                            actions.push({ id: n, type: 'remove' });
+                            actions.push({ id: n, type: "remove" });
                         }
                     });
                 });
 
                 return await window
-                    .require('WAWebCollections')
+                    .require("WAWebCollections")
                     .Label.addOrRemoveLabels(actions, chats);
             },
             labelIds,
@@ -3031,10 +3035,10 @@ class Client extends EventEmitter {
     async getGroupMembershipRequests(groupId) {
         return await this.pupPage.evaluate(async (groupId) => {
             const groupWid = window
-                .require('WAWebWidFactory')
+                .require("WAWebWidFactory")
                 .createWid(groupId);
             return await window
-                .require('WAWebApiMembershipApprovalRequestStore')
+                .require("WAWebApiMembershipApprovalRequestStore")
                 .getMembershipApprovalRequests(groupWid);
         }, groupId);
     }
@@ -3066,7 +3070,7 @@ class Client extends EventEmitter {
                 const { requesterIds = null, sleep = [250, 500] } = options;
                 return await window.WWebJS.membershipRequestAction(
                     groupId,
-                    'Approve',
+                    "Approve",
                     requesterIds,
                     sleep,
                 );
@@ -3088,7 +3092,7 @@ class Client extends EventEmitter {
                 const { requesterIds = null, sleep = [250, 500] } = options;
                 return await window.WWebJS.membershipRequestAction(
                     groupId,
-                    'Reject',
+                    "Reject",
                     requesterIds,
                     sleep,
                 );
@@ -3105,13 +3109,13 @@ class Client extends EventEmitter {
     async setAutoDownloadAudio(flag) {
         await this.pupPage.evaluate(async (flag) => {
             const autoDownload = window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .getAutoDownloadAudio();
             if (autoDownload === flag) {
                 return flag;
             }
             await window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .setAutoDownloadAudio(flag);
             return flag;
         }, flag);
@@ -3124,13 +3128,13 @@ class Client extends EventEmitter {
     async setAutoDownloadDocuments(flag) {
         await this.pupPage.evaluate(async (flag) => {
             const autoDownload = window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .getAutoDownloadDocuments();
             if (autoDownload === flag) {
                 return flag;
             }
             await window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .setAutoDownloadDocuments(flag);
             return flag;
         }, flag);
@@ -3143,13 +3147,13 @@ class Client extends EventEmitter {
     async setAutoDownloadPhotos(flag) {
         await this.pupPage.evaluate(async (flag) => {
             const autoDownload = window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .getAutoDownloadPhotos();
             if (autoDownload === flag) {
                 return flag;
             }
             await window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .setAutoDownloadPhotos(flag);
             return flag;
         }, flag);
@@ -3162,13 +3166,13 @@ class Client extends EventEmitter {
     async setAutoDownloadVideos(flag) {
         await this.pupPage.evaluate(async (flag) => {
             const autoDownload = window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .getAutoDownloadVideos();
             if (autoDownload === flag) {
                 return flag;
             }
             await window
-                .require('WAWebUserPrefsGeneral')
+                .require("WAWebUserPrefsGeneral")
                 .setAutoDownloadVideos(flag);
             return flag;
         }, flag);
@@ -3183,13 +3187,13 @@ class Client extends EventEmitter {
     async setBackgroundSync(flag) {
         return await this.pupPage.evaluate(async (flag) => {
             const backSync = window
-                .require('WAWebUserPrefsNotifications')
+                .require("WAWebUserPrefsNotifications")
                 .getGlobalOfflineNotifications();
             if (backSync === flag) {
                 return flag;
             }
             await window
-                .require('WAWebUserPrefsNotifications')
+                .require("WAWebUserPrefsNotifications")
                 .setGlobalOfflineNotifications(flag);
             return flag;
         }, flag);
@@ -3205,15 +3209,15 @@ class Client extends EventEmitter {
     async getContactDeviceCount(userId) {
         return await this.pupPage.evaluate(async (userId) => {
             const devices = await window
-                .require('WAWebApiDeviceList')
+                .require("WAWebApiDeviceList")
                 .getDeviceIds([
-                    window.require('WAWebWidFactory').createWid(userId),
+                    window.require("WAWebWidFactory").createWid(userId),
                 ]);
             if (
                 devices &&
                 devices.length &&
                 devices[0] != null &&
-                typeof devices[0].devices == 'object'
+                typeof devices[0].devices == "object"
             ) {
                 return devices[0].devices.length;
             }
@@ -3228,13 +3232,13 @@ class Client extends EventEmitter {
      */
     async syncHistory(chatId) {
         return await this.pupPage.evaluate(async (chatId) => {
-            const chatWid = window.require('WAWebWidFactory').createWid(chatId);
+            const chatWid = window.require("WAWebWidFactory").createWid(chatId);
             const chat =
-                window.require('WAWebCollections').Chat.get(chatWid) ??
-                (await window.require('WAWebCollections').Chat.find(chatWid));
+                window.require("WAWebCollections").Chat.get(chatWid) ??
+                (await window.require("WAWebCollections").Chat.find(chatWid));
             if (chat?.endOfHistoryTransferType === 0) {
                 await window
-                    .require('WAWebSendNonMessageDataRequest')
+                    .require("WAWebSendNonMessageDataRequest")
                     .sendPeerDataOperationRequest(3, {
                         chatId: chat.id,
                     });
@@ -3251,7 +3255,7 @@ class Client extends EventEmitter {
      * @returns {Promise<string>} The WhatsApp call link (https://call.whatsapp.com/video/XxXxXxXxXxXxXx) or an empty string if a generation failed.
      */
     async createCallLink(startTime, callType) {
-        if (!['video', 'voice'].includes(callType)) {
+        if (!["video", "voice"].includes(callType)) {
             throw new (class CreateCallLinkError extends Error {
                 constructor(m) {
                     super(m);
@@ -3266,9 +3270,9 @@ class Client extends EventEmitter {
         return await this.pupPage.evaluate(
             async (startTimeTs, callType) => {
                 const response = await window
-                    .require('WAWebGenerateEventCallLink')
+                    .require("WAWebGenerateEventCallLink")
                     .createEventCallLink(startTimeTs, callType);
-                return response ?? '';
+                return response ?? "";
             },
             startTime,
             callType,
@@ -3287,16 +3291,16 @@ class Client extends EventEmitter {
         return await this.pupPage.evaluate(
             async (response, msgId) => {
                 const eventMsg =
-                    window.require('WAWebCollections').Msg.get(msgId) ||
+                    window.require("WAWebCollections").Msg.get(msgId) ||
                     (
                         await window
-                            .require('WAWebCollections')
+                            .require("WAWebCollections")
                             .Msg.getMessagesById([msgId])
                     )?.messages?.[0];
                 if (!eventMsg) return false;
 
                 await window
-                    .require('WAWebSendEventResponseMsgAction')
+                    .require("WAWebSendEventResponseMsgAction")
                     .sendEventResponseMsg(response, eventMsg);
                 return true;
             },
@@ -3322,7 +3326,7 @@ class Client extends EventEmitter {
         return await this.pupPage.evaluate(
             async (phoneNumber, firstName, lastName, syncToAddressbook) => {
                 return await window
-                    .require('WAWebSaveContactAction')
+                    .require("WAWebSaveContactAction")
                     .saveContactAction({
                         firstName: firstName,
                         lastName: lastName,
@@ -3347,10 +3351,10 @@ class Client extends EventEmitter {
     async deleteAddressbookContact(phoneNumber) {
         return await this.pupPage.evaluate(async (phoneNumber) => {
             const wid = window
-                .require('WAWebWidFactory')
+                .require("WAWebWidFactory")
                 .createWid(phoneNumber);
             return await window
-                .require('WAWebDeleteContactAction')
+                .require("WAWebDeleteContactAction")
                 .deleteContactAction({ phoneNumber: wid });
         }, phoneNumber);
     }
@@ -3388,18 +3392,18 @@ class Client extends EventEmitter {
     async addOrEditCustomerNote(userId, note) {
         return await this.pupPage.evaluate(
             async (userId, note) => {
-                if (!window.require('WAWebBizGatingUtils').smbNotesV1Enabled())
+                if (!window.require("WAWebBizGatingUtils").smbNotesV1Enabled())
                     return;
 
                 return window
-                    .require('WAWebNoteAction')
+                    .require("WAWebNoteAction")
                     .noteAddAction(
-                        'unstructured',
+                        "unstructured",
                         window
-                            .require('WAWebWidToJid')
+                            .require("WAWebWidToJid")
                             .widToUserJid(
                                 window
-                                    .require('WAWebWidFactory')
+                                    .require("WAWebWidFactory")
                                     .createWid(userId),
                             ),
                         note,
@@ -3425,16 +3429,16 @@ class Client extends EventEmitter {
      */
     async getCustomerNote(userId) {
         return await this.pupPage.evaluate(async (userId) => {
-            if (!window.require('WAWebBizGatingUtils').smbNotesV1Enabled())
+            if (!window.require("WAWebBizGatingUtils").smbNotesV1Enabled())
                 return null;
 
             const note = await window
-                .require('WAWebNoteAction')
+                .require("WAWebNoteAction")
                 .retrieveOnlyNoteForChatJid(
                     window
-                        .require('WAWebWidToJid')
+                        .require("WAWebWidToJid")
                         .widToUserJid(
-                            window.require('WAWebWidFactory').createWid(userId),
+                            window.require("WAWebWidFactory").createWid(userId),
                         ),
                 );
 
@@ -3443,7 +3447,7 @@ class Client extends EventEmitter {
             if (!serialized) return null;
 
             serialized.chatId = window
-                .require('WAWebJidToWid')
+                .require("WAWebJidToWid")
                 .userJidToUserWid(serialized.chatJid)._serialized;
             delete serialized.chatJid;
 
@@ -3460,16 +3464,16 @@ class Client extends EventEmitter {
         const msg = await this.getMessageById(messageId);
         if (!msg) return [];
         if (msg.type != MessageTypes.POLL_CREATION)
-            throw 'Invalid usage! Can only be used with a pollCreation message';
+            throw "Invalid usage! Can only be used with a pollCreation message";
 
         const pollVotes = await this.pupPage.evaluate(async (msg) => {
             const msgKey = window
-                .require('WAWebMsgKey')
+                .require("WAWebMsgKey")
                 .fromString(msg.id._serialized);
             let pollVotes = await window
-                .require('WAWebPollsVotesSchema')
+                .require("WAWebPollsVotesSchema")
                 .getTable()
-                .equals(['parentMsgKey'], msgKey.toString());
+                .equals(["parentMsgKey"], msgKey.toString());
 
             return pollVotes.map((item) => {
                 const typedArray = new Uint8Array(item.selectedOptionLocalIds);
